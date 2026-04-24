@@ -22,9 +22,9 @@ services:
     restart: unless-stopped
 
   # PgPool-II (Балансировщик и пул соединений)
-  # Используем актуальный тег образа bitnami/pgpool:4.5
+  # Используем образ из bitnamilegacy т.к. новые образы bitnami на базе Photon Linux
   pgpool:
-    image: docker.io/bitnami/pgpool:4.5
+    image: docker.io/bitnamilegacy/pgpool:4.5
     container_name: pgpool
     environment:
       PGPOOL_BACKEND_NODES: 0:pg-primary:5432
