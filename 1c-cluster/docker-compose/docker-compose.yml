@@ -75,9 +75,9 @@ services:
       restart_policy:
         condition: on-failure
 
-  # 1С:Агент кластера (RAS) - основной
+  # 1С:Агент кластера (RAS) - основной (Тестовая версия с демо-лицензией)
   ras-primary:
-    image: docker.io/ghcr.io/1c-company/1c:enterprise-server-ubuntu
+    image: docker.io/alexanderfefelov/1c-enterprise-server:8.3.23-ubuntu22.04
     container_name: ras-primary
     hostname: ras-primary
     environment:
@@ -85,7 +85,7 @@ services:
       - SRV1CV8_USERS=usr1cv
       - SRV1CV8_PWD=passwd123
       - SRV1CV8_AGPORT=1541
-      - SRV1CV8_RLZ_ADD=-rlz /opt/1C/v8.3/x86_64/license.lic
+      # Демо-лицензия активируется автоматически при первом запуске
     volumes:
       - ras_primary_data:/home/usr1cv/.1cv8
       - shared-data:/mnt/shared
@@ -103,9 +103,9 @@ services:
       restart_policy:
         condition: on-failure
 
-  # 1С:Агент кластера (RAS) - резервный
+  # 1С:Агент кластера (RAS) - резервный (Тестовая версия)
   ras-replica:
-    image: docker.io/ghcr.io/1c-company/1c:enterprise-server-ubuntu
+    image: docker.io/alexanderfefelov/1c-enterprise-server:8.3.23-ubuntu22.04
     container_name: ras-replica
     hostname: ras-replica
     environment:
@@ -113,7 +113,6 @@ services:
       - SRV1CV8_USERS=usr1cv
       - SRV1CV8_PWD=passwd123
       - SRV1CV8_AGPORT=1541
-      - SRV1CV8_RLZ_ADD=-rlz /opt/1C/v8.3/x86_64/license.lic
     volumes:
       - ras_replica_data:/home/usr1cv/.1cv8
       - shared-data:/mnt/shared
