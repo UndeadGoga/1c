@@ -1,60 +1,53 @@
 services:
-  # PostgreSQL Cluster (Primary + Replica)
-  postgres-primary:
-    image: docker.io/library/postgres:15-alpine
+  # Основная база данных (Primary)
+  pg-primary:
+    image: postgres:15-alpine
     container_name: pg-primary
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
-      POSTGRES_DB: template1
+      POSTGRES_DB: demo_db
+      REPLICATION_MODE: primary
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: replicator123
     volumes:
       - pg_primary_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - ./postgres/init-primary.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - 1c-network
+      - 1c-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
-    deploy:
-      restart_policy:
-        condition: on-failure
 
-  postgres-replica:
-    image: docker.io/library/postgres:15-alpine
+  # Реплика базы данных (Replica)
+  pg-replica:
+    image: postgres:15-alpine
     container_name: pg-replica
     environment:
-      PGUSER: replicator
-      PGPASSWORD: replicator123
-    command: >
-      bash -c "
-      until pg_basebackup --pgdata=/var/lib/postgresql/data -R --slot=replication_slot --host=pg-primary --port=5432 --username=replicator --verbose; do
-      echo 'Waiting for primary to connect...'
-      sleep 1s
-      done
-      echo 'Backup done, starting replica...'
-      chmod 0700 /var/lib/postgresql/data
-      postgres
-      "
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      REPLICATION_MODE: replica
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: replicator123
+      PRIMARY_HOST: pg-primary
+    depends_on:
+      pg-primary:
+        condition: service_healthy
     volumes:
       - pg_replica_data:/var/lib/postgresql/data
     networks:
-      - 1c-network
-    depends_on:
-      - postgres-primary
+      - 1c-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
-    deploy:
-      restart_policy:
-        condition: on-failure
 
-  # PgPool-II для балансировки PostgreSQL
+  # Балансировщик соединений для БД (PgPool-II)
   pgpool:
-    image: docker.io/bitnami/pgpool:4.4
+    image: bitnami/pgpool:4.4
     container_name: pgpool
     environment:
       PGPOOL_BACKEND_NODES: 0:pg-primary:5432,1:pg-replica:5432
@@ -64,163 +57,86 @@ services:
       PGPOOL_ADMIN_PASSWORD: admin123
       PGPOOL_ENABLE_LOAD_BALANCING: yes
       PGPOOL_FAILOVER_ON_BACKEND_ERROR: yes
+      PGPOOL_HEALTH_CHECK_PERIOD: 10
+      PGPOOL_HEALTH_CHECK_TIMEOUT: 5
+      PGPOOL_HEALTH_CHECK_MAX_RETRIES: 3
     ports:
-      - "5433:5432"
-    networks:
-      - 1c-network
+      - "5433:5432" # Доступ для 1С с хоста
     depends_on:
-      - postgres-primary
-      - postgres-replica
-    deploy:
-      restart_policy:
-        condition: on-failure
-
-  # 1С:Агент кластера (RAS) - основной (Тестовая версия с демо-лицензией)
-  ras-primary:
-    image: docker.io/alexanderfefelov/1c-enterprise-server:8.3.23-ubuntu22.04
-    container_name: ras-primary
-    hostname: ras-primary
-    environment:
-      - SRV1CV8_SRVINST=0
-      - SRV1CV8_USERS=usr1cv
-      - SRV1CV8_PWD=passwd123
-      - SRV1CV8_AGPORT=1541
-      # Демо-лицензия активируется автоматически при первом запуске
-    volumes:
-      - ras_primary_data:/home/usr1cv/.1cv8
-      - shared-data:/mnt/shared
-    ports:
-      - "1540-1541:1540-1541"
-      - "9100-9199:9100-9199"
+      pg-primary:
+        condition: service_healthy
+      pg-replica:
+        condition: service_healthy
     networks:
-      - 1c-network
-    healthcheck:
-      test: ["CMD", "pgrep", "-f", "rmngr"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      restart_policy:
-        condition: on-failure
+      - 1c-net
+    restart: always
 
-  # 1С:Агент кластера (RAS) - резервный (Тестовая версия)
-  ras-replica:
-    image: docker.io/alexanderfefelov/1c-enterprise-server:8.3.23-ubuntu22.04
-    container_name: ras-replica
-    hostname: ras-replica
-    environment:
-      - SRV1CV8_SRVINST=0
-      - SRV1CV8_USERS=usr1cv
-      - SRV1CV8_PWD=passwd123
-      - SRV1CV8_AGPORT=1541
-    volumes:
-      - ras_replica_data:/home/usr1cv/.1cv8
-      - shared-data:/mnt/shared
-    ports:
-      - "2540-2541:1540-1541"
-      - "9200-9299:9100-9199"
-    networks:
-      - 1c-network
-    depends_on:
-      - ras-primary
-    healthcheck:
-      test: ["CMD", "pgrep", "-f", "rmngr"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      restart_policy:
-        condition: on-failure
-
-  # Балансировщик нагрузки для 1С (HAProxy)
+  # HAProxy (для балансировки 1С, если потребуется несколько серверов в будущем)
   haproxy:
-    image: docker.io/library/haproxy:2.8-alpine
+    image: haproxy:2.8-alpine
     container_name: haproxy-1c
     volumes:
-      - ./docker-compose/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
-      - "8080:8080"
-      - "1541:1541"
+      - "8787:8787" # Порт для подключения клиентов 1С (если нужно)
     networks:
-      - 1c-network
-    depends_on:
-      - ras-primary
-      - ras-replica
-    deploy:
-      restart_policy:
-        condition: on-failure
+      - 1c-net
+    restart: unless-stopped
 
-  # Prometheus для мониторинга
+  # Prometheus (Мониторинг)
   prometheus:
-    image: docker.io/prom/prometheus:v2.47.0
+    image: prom/prometheus:v2.47.0
     container_name: prometheus
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=15d'
-      - '--web.enable-lifecycle'
     ports:
       - "9090:9090"
     networks:
-      - 1c-network
-    deploy:
-      restart_policy:
-        condition: on-failure
+      - 1c-net
+    restart: unless-stopped
 
-  # Grafana для визуализации
+  # Node Exporter (Метрики хоста и контейнеров)
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    networks:
+      - 1c-net
+    restart: unless-stopped
+
+  # Grafana (Визуализация)
   grafana:
-    image: docker.io/grafana/grafana:10.1.0
+    image: grafana/grafana:10.1.0
     container_name: grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     ports:
       - "3000:3000"
-    networks:
-      - 1c-network
     depends_on:
       - prometheus
-    deploy:
-      restart_policy:
-        condition: on-failure
-
-  # Node Exporter для сбора метрик хоста
-  node-exporter:
-    image: docker.io/prom/node-exporter:v1.6.1
-    container_name: node-exporter
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
     networks:
-      - 1c-network
-    deploy:
-      restart_policy:
-        condition: on-failure
-
-networks:
-  1c-network:
-    driver: bridge
+      - 1c-net
+    restart: unless-stopped
 
 volumes:
   pg_primary_data:
   pg_replica_data:
-  ras_primary_data:
-  ras_replica_data:
-  shared-data:
   prometheus_data:
   grafana_data:
+
+networks:
+  1c-net:
+    driver: bridge

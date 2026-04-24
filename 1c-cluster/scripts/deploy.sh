@@ -1,9 +1,11 @@
 #!/bin/bash
-# Скрипт быстрого развёртывания кластера 1С
 
+# Скрипт быстрого запуска стенда
 set -e
 
-echo "🚀 Развёртывание отказоустойчивого кластера 1С..."
+echo "🚀 Запуск отказоустойчивого кластера PostgreSQL для 1С..."
+
+cd "$(dirname "$0")/../docker-compose"
 
 # Проверка наличия Docker
 if ! command -v docker &> /dev/null; then
@@ -11,37 +13,37 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Проверка наличия Docker Compose
-if ! docker compose version &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     echo "❌ Docker Compose не найден. Пожалуйста, установите Docker Compose."
     exit 1
 fi
 
-echo "✅ Docker и Docker Compose найдены"
+# Остановка старых контейнеров (если есть)
+echo "🧹 Очистка старых контейнеров..."
+docker compose down --remove-orphans 2>/dev/null || true
 
-# Переход в директорию с docker-compose
-cd "$(dirname "$0")/docker-compose"
-
-echo "📦 Запуск контейнеров..."
+# Запуск сервисов
+echo "📦 Запуск сервисов (PostgreSQL Primary, Replica, PgPool, Monitoring)..."
 docker compose up -d
 
 echo ""
-echo "⏳ Ожидание готовности сервисов (30 секунд)..."
-sleep 30
-
+echo "✅ Стенд запущен!"
 echo ""
-echo "📊 Статус контейнеров:"
-docker compose ps
-
+echo "📊 Полезная информация:"
+echo "   - Порт доступа к БД для 1С: localhost:5433 (PgPool)"
+echo "   - Логин/Пароль БД: postgres / postgres123"
+echo "   - Имя БД: demo_db"
 echo ""
-echo "✅ Кластер успешно развёрнут!"
+echo "📈 Мониторинг:"
+echo "   - Grafana: http://localhost:3000 (admin/admin)"
+echo "   - Prometheus: http://localhost:9090"
+echo "   - HAProxy Stats: http://localhost:8787/stats"
 echo ""
-echo "🔌 Доступные сервисы:"
-echo "   • PostgreSQL (через PgPool): localhost:5433"
-echo "   • 1С RAS (балансировщик): localhost:1541"
-echo "   • Веб-сервисы 1С: localhost:8080"
-echo "   • Prometheus: http://localhost:9090"
-echo "   • Grafana: http://localhost:3000 (admin/admin123)"
-echo "   • HAProxy Stats: http://localhost:8404/stats"
+echo "🔧 Следующие шаги:"
+echo "   1. Убедитесь, что сервер 1С запущен на хосте."
+echo "   2. Создайте базу в консоли администрирования 1С:"
+echo "      - Сервер БД: localhost"
+echo "      - Порт: 5433"
+echo "      - Тип СУБД: PostgreSQL"
 echo ""
-echo "📝 Для остановки выполните: docker compose down"
+echo "🛑 Для остановки выполните: docker compose down"
