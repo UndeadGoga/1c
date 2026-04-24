@@ -1,0 +1,66 @@
+# Ansible Playbook для развертывания инфраструктуры 1С + PostgreSQL
+# Этот плейбук устанавливает Docker, настраивает окружение и запускает контейнеры
+
+- name: Развертывание отказоустойчивого кластера 1С + PostgreSQL
+  hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    docker_packages:
+      - docker.io
+      - docker-compose
+    project_path: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Установка Docker и зависимостей
+      apt:
+        name: "{{ docker_packages }}"
+        state: present
+        update_cache: yes
+      tags: [docker]
+
+    - name: Запуск службы Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      tags: [docker]
+
+    - name: Добавление текущего пользователя в группу docker
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+      tags: [docker]
+
+    - name: Проверка наличия docker-compose.yml
+      stat:
+        path: "{{ project_path }}/docker-compose/docker-compose.yml"
+      register: compose_file
+      tags: [deploy]
+
+    - name: Запуск стека через docker compose
+      community.docker.docker_compose:
+        project_src: "{{ project_path }}/docker-compose"
+        state: present
+        detached: yes
+      when: compose_file.stat.exists
+      tags: [deploy]
+
+    - name: Вывод информации о запущенных сервисах
+      debug:
+        msg: |
+          ✅ Стенд развернут!
+          
+          📊 Доступ к базам данных:
+             - Хост: localhost
+             - Порт: 5433 (PgPool)
+             - Логин: postgres
+             - Пароль: postgres123
+          
+          📈 Мониторинг:
+             - Grafana: http://localhost:3000 (admin/admin)
+             - Prometheus: http://localhost:9090
+          
+          🔧 Следующие шаги:
+             Настройте подключение в консоли администрирования сервера 1С.
