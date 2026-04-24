@@ -2,7 +2,10 @@
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
+
+# Dependencies
+node_modules/
 
 # Logs and temp files
 *.log
@@ -10,30 +13,36 @@
 
 # Editors
 .vscode/
-
-# Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-*.pyc
-
-# Build artifacts
-dist/
-build/
-target/
+.idea/
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/refs/heads/*
+!.git/refs/heads/main
+!.git/refs/heads/master
+!.git/refs/heads/develop
+!.git/refs/heads/release
+!.git/refs/heads/hotfix
+!.git/refs/heads/feature
 ```
