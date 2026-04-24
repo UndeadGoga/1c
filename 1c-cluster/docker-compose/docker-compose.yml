@@ -1,18 +1,17 @@
 services:
   # Основная база данных (Primary)
   pg-primary:
-    image: postgres:15-alpine
+    image: docker.io/library/postgres:15-alpine
     container_name: pg-primary
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
       POSTGRES_DB: demo_db
-      REPLICATION_MODE: primary
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replicator123
     volumes:
       - pg_primary_data:/var/lib/postgresql/data
       - ./postgres/init-primary.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432" # Прямой доступ к БД для 1С
     networks:
       - 1c-net
     healthcheck:
@@ -20,72 +19,47 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
-  # Реплика базы данных (Replica)
-  pg-replica:
-    image: postgres:15-alpine
-    container_name: pg-replica
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
-      REPLICATION_MODE: replica
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replicator123
-      PRIMARY_HOST: pg-primary
-    depends_on:
-      pg-primary:
-        condition: service_healthy
-    volumes:
-      - pg_replica_data:/var/lib/postgresql/data
-    networks:
-      - 1c-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Балансировщик соединений для БД (PgPool-II)
+  # PgPool-II (Балансировщик и пул соединений)
+  # Используем актуальный тег образа bitnami/pgpool:4.5
   pgpool:
-    image: bitnami/pgpool:4.4
+    image: docker.io/bitnami/pgpool:4.5
     container_name: pgpool
     environment:
-      PGPOOL_BACKEND_NODES: 0:pg-primary:5432,1:pg-replica:5432
+      PGPOOL_BACKEND_NODES: 0:pg-primary:5432
       PGPOOL_POSTGRES_USERNAME: postgres
       PGPOOL_POSTGRES_PASSWORD: postgres123
       PGPOOL_ADMIN_USERNAME: admin
       PGPOOL_ADMIN_PASSWORD: admin123
-      PGPOOL_ENABLE_LOAD_BALANCING: yes
-      PGPOOL_FAILOVER_ON_BACKEND_ERROR: yes
-      PGPOOL_HEALTH_CHECK_PERIOD: 10
-      PGPOOL_HEALTH_CHECK_TIMEOUT: 5
-      PGPOOL_HEALTH_CHECK_MAX_RETRIES: 3
+      PGPOOL_ENABLE_LOAD_BALANCING: "no"
+      PGPOOL_HEALTH_CHECK_PERIOD: "10"
+      PGPOOL_HEALTH_CHECK_TIMEOUT: "5"
+      PGPOOL_HEALTH_CHECK_MAX_RETRIES: "3"
     ports:
-      - "5433:5432" # Доступ для 1С с хоста
+      - "5433:5432" # Доступ для 1С через балансировщик
     depends_on:
       pg-primary:
-        condition: service_healthy
-      pg-replica:
         condition: service_healthy
     networks:
       - 1c-net
     restart: always
 
-  # HAProxy (для балансировки 1С, если потребуется несколько серверов в будущем)
+  # HAProxy (опционально, для будущих расширений)
   haproxy:
-    image: haproxy:2.8-alpine
+    image: docker.io/library/haproxy:2.8-alpine
     container_name: haproxy-1c
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
-      - "8787:8787" # Порт для подключения клиентов 1С (если нужно)
+      - "8787:8787"
     networks:
       - 1c-net
     restart: unless-stopped
 
   # Prometheus (Мониторинг)
   prometheus:
-    image: prom/prometheus:v2.47.0
+    image: docker.io/prom/prometheus:v2.47.0
     container_name: prometheus
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -101,7 +75,7 @@ services:
 
   # Node Exporter (Метрики хоста и контейнеров)
   node-exporter:
-    image: prom/node-exporter:v1.6.1
+    image: docker.io/prom/node-exporter:v1.6.1
     container_name: node-exporter
     command:
       - '--path.rootfs=/host'
@@ -113,12 +87,11 @@ services:
 
   # Grafana (Визуализация)
   grafana:
-    image: grafana/grafana:10.1.0
+    image: docker.io/grafana/grafana:10.1.0
     container_name: grafana
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -133,7 +106,6 @@ services:
 
 volumes:
   pg_primary_data:
-  pg_replica_data:
   prometheus_data:
   grafana_data:
 

@@ -1,34 +1,39 @@
 ```
-# Logs and temp files
-*.log
-*.tmp
-
-# Environment files
+# Environment
 .env
 .env.local
 *.env.*
 
-# Editor/IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
+# Logs and temp files
+*.log
+*.tmp
 
-# System files
-.DS_Store
-Thumbs.db
+# Editors
+.vscode/
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
 
 # Build artifacts
 dist/
 build/
 target/
 
-# Dependencies
-node_modules/
-.venv/
-venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-.gradle/
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
 ```
