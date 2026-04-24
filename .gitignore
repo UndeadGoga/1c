@@ -1,48 +1,75 @@
 ```
-# Environment
+# Environment variables
 .env
 .env.local
-.env.*
+*.env.*
 
-# Dependencies
-node_modules/
-
-# Logs and temp files
+# Logs
 *.log
-*.tmp
 
-# Editors
-.vscode/
-.idea/
+# Temporary files
+*.tmp
+*.swp
+*.swo
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
+# Dependencies
+node_modules/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+__pycache__/
+*.egg-info/
+
+# Build artifacts
+dist/
+build/
+target/
+*.pyc
+*.class
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Coverage reports
+coverage/
+htmlcov/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/refs/heads/*
-!.git/refs/heads/main
-!.git/refs/heads/master
-!.git/refs/heads/develop
-!.git/refs/heads/release
-!.git/refs/heads/hotfix
-!.git/refs/heads/feature
+
+# IDE specific
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```

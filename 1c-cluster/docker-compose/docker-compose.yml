@@ -21,30 +21,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # PgPool-II (Балансировщик и пул соединений)
-  # Используем образ из bitnamilegacy т.к. новые образы bitnami на базе Photon Linux
-  pgpool:
-    image: docker.io/bitnamilegacy/pgpool:4.5
-    container_name: pgpool
-    environment:
-      PGPOOL_BACKEND_NODES: 0:pg-primary:5432
-      PGPOOL_POSTGRES_USERNAME: postgres
-      PGPOOL_POSTGRES_PASSWORD: postgres123
-      PGPOOL_ADMIN_USERNAME: admin
-      PGPOOL_ADMIN_PASSWORD: admin123
-      PGPOOL_ENABLE_LOAD_BALANCING: "no"
-      PGPOOL_HEALTH_CHECK_PERIOD: "10"
-      PGPOOL_HEALTH_CHECK_TIMEOUT: "5"
-      PGPOOL_HEALTH_CHECK_MAX_RETRIES: "3"
-    ports:
-      - "5433:5432" # Доступ для 1С через балансировщик
-    depends_on:
-      pg-primary:
-        condition: service_healthy
-    networks:
-      - 1c-net
-    restart: always
-
   # HAProxy (опционально, для будущих расширений)
   haproxy:
     image: docker.io/library/haproxy:2.8-alpine
