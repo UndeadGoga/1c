@@ -1,0 +1,30 @@
+---
+- name: Общая настройка всех хостов
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Установка Docker
+  hosts: all
+  become: yes
+  roles:
+    - docker
+
+- name: Настройка PostgreSQL
+  hosts: postgres
+  become: yes
+  roles:
+    - postgres
+
+- name: Настройка серверов 1С
+  hosts: servers_1c
+  become: yes
+  roles:
+    - 1c-server
+
+- name: Настройка мониторинга
+  hosts: monitoring
+  become: yes
+  roles:
+    - monitoring

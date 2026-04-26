@@ -1,0 +1,81 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+
+title Сценарий Disaster Recovery: полный отказ ЦОД
+
+actor "Администратор" as Admin
+participant "Terraform" as TF
+participant "Ansible" as Ansible
+participant "DR-сайт\n(резервный ЦОД)" as DR
+participant "S3-хранилище" as S3
+participant "PostgreSQL\nReplica (DR)" as PGDR
+participant "1С Сервер\n(DR)" as S1CDR
+
+== Активация DR-сайта ==
+Admin -> TF : terraform apply -var="site=dr"
+activate TF
+TF -> DR : Создание ВМ (1С + PostgreSQL + Monitoring)
+activate DR
+DR --> TF : ВМ готовы
+
+deactivate DR
+TF --> Admin : Инфраструктура развёрнута
+
+deactivate TF
+
+== Конфигурация ОС и ПО ==
+Admin -> Ansible : ansible-playbook -i inventory/dr.yml
+activate Ansible
+Ansible -> DR : Установка Docker, зависимостей
+Ansible -> DR : Настройка sysctl, timezone
+Ansible -> DR : Развёртывание контейнеров
+DR --> Ansible : Настроено
+Ansible --> Admin : Готово
+
+deactivate Ansible
+
+== Восстановление данных ==
+Admin -> S3 : Запрос последнего backup
+activate S3
+S3 --> Admin : pg_basebackup_YYYYMMDD.tar.gz
+
+deactivate S3
+
+Admin -> PGDR : Восстановление из base backup
+activate PGDR
+PGDR --> Admin : База восстановлена
+
+deactivate PGDR
+
+Admin -> PGDR : Применение WAL-архивов
+activate PGDR
+PGDR -> S3 : Скачивание недостающих WAL
+activate S3
+S3 --> PGDR : WAL-файлы
+
+deactivate S3
+PGDR --> Admin : PITR завершён
+
+deactivate PGDR
+
+== Переключение трафика ==
+Admin -> DNS : Обновление A-записи
+activate DNS
+DNS --> Admin : TTL 300 сек
+
+deactivate DNS
+
+== Проверка работоспособности ==
+Admin -> S1CDR : Подключение тонкого клиента
+activate S1CDR
+S1CDR -> PGDR : SELECT 1
+activate PGDR
+PGDR --> S1CDR : OK
+
+deactivate PGDR
+S1CDR --> Admin : 1С запущена, данные целостны
+
+deactivate S1CDR
+
+@enduml

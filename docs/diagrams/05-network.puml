@@ -1,0 +1,57 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+
+title Сетевая топология кластера
+
+nwdiag {
+    network dmz {
+        address = "10.0.10.0/24"
+        description = "Публичная зона (DMZ)"
+        color = "#E3F2FD"
+        router [address = "10.0.10.1", shape = router]
+        haproxy [address = "10.0.10.10", description = "HAProxy"]
+    }
+
+    network app {
+        address = "172.20.1.0/24"
+        description = "Сеть приложений (Docker frontend)"
+        color = "#FFF8E1"
+        haproxy [address = "172.20.1.2"]
+        1c1 [address = "172.20.1.11", description = "1c-server-1"]
+        1c2 [address = "172.20.1.12", description = "1c-server-2"]
+        ras [address = "172.20.1.15", description = "1c-ras"]
+    }
+
+    network backend {
+        address = "172.20.0.0/24"
+        description = "Сеть БД и сервисов (Docker backend)"
+        color = "#E8F5E9"
+        1c1 [address = "172.20.0.11"]
+        1c2 [address = "172.20.0.12"]
+        ras [address = "172.20.0.15"]
+        pgprimary [address = "172.20.0.21", description = "postgres-primary"]
+        pgreplica [address = "172.20.0.22", description = "postgres-replica"]
+        prometheus [address = "172.20.0.31", description = "prometheus"]
+        grafana [address = "172.20.0.32", description = "grafana"]
+    }
+
+    network monitoring {
+        address = "172.20.2.0/24"
+        description = "Сеть мониторинга (Docker mon_net)"
+        color = "#FFEBEE"
+        prometheus [address = "172.20.2.31"]
+        grafana [address = "172.20.2.32"]
+        alertmanager [address = "172.20.2.33", description = "alertmanager"]
+        nodeexp [address = "172.20.2.100", description = "node-exporter"]
+    }
+
+    network storage {
+        address = "10.0.50.0/24"
+        description = "Сеть хранения"
+        color = "#F5F5F5"
+        nas [address = "10.0.50.10", description = "NAS / NFS", shape = disk]
+        s3 [address = "10.0.50.20", description = "MinIO S3", shape = disk]
+    }
+}
+@enduml

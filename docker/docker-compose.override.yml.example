@@ -1,0 +1,30 @@
+# =============================================================================
+# Пример override-файла для Docker Compose
+# =============================================================================
+# Скопируйте в docker-compose.override.yml и настройте под свою среду.
+# =============================================================================
+
+version: "3.8"
+
+services:
+  1c-server-1:
+    environment:
+      SRV1CV8_DEBUG: "true"
+    # Для production:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
+    #       memory: 8G
+
+  1c-server-2:
+    environment:
+      SRV1CV8_DEBUG: "true"
+
+  postgres-primary:
+    environment:
+      POSTGRES_PASSWORD: "my_strong_password"
+      REPLICATOR_PASSWORD: "my_strong_repl_password"
+    volumes:
+      - /mnt/nfs/pg_primary:/var/lib/postgresql/data
+      - /mnt/nfs/backup:/backup

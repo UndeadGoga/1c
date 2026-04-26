@@ -1,0 +1,81 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+
+title Сценарий отказоустойчивости: Failover PostgreSQL Primary → Replica
+
+actor "Администратор" as Admin
+participant "Мониторинг\n(Prometheus/ Grafana)" as Mon
+participant "PostgreSQL\nPrimary" as Primary
+participant "PostgreSQL\nReplica" as Replica
+participant "HAProxy" as HAProxy
+participant "1С Сервер" as S1C
+
+group Периодическая проверка
+    Mon -> Primary : pg_up probe
+    activate Primary
+    Primary --> Mon : OK
+    deactivate Primary
+end
+
+group Отказ Primary
+    Mon -> Primary : pg_up probe
+    activate Primary #FFCCCC
+    Primary -x Mon : timeout / connection refused
+    deactivate Primary
+    Mon -> Alertmanager : ALERT: PostgreSQLPrimaryDown
+    activate Mon #FFCCCC
+    Mon --> Admin : Email / Telegram
+    deactivate Mon
+end
+
+group Ручной Failover
+    Admin -> Replica : pg_is_in_recovery()
+    activate Replica
+    Replica --> Admin : t (standby)
+    deactivate Replica
+
+    Admin -> Primary : systemctl stop postgresql
+    activate Primary #FFCCCC
+    deactivate Primary
+
+    Admin -> Replica : pg_ctl promote
+    activate Replica
+    Replica --> Admin : OK
+    deactivate Replica
+
+    Admin -> Replica : SELECT pg_is_in_recovery()
+    activate Replica
+    Replica --> Admin : f (master)
+    deactivate Replica
+end
+
+group Переключение 1С
+    Admin -> HAProxy : Обновление backend
+    activate HAProxy
+    HAProxy --> Admin : Новый Primary в пуле
+    deactivate HAProxy
+
+    S1C -> HAProxy : Запрос к PostgreSQL
+    activate HAProxy
+    HAProxy -> Replica : TCP 5432
+    activate Replica
+    Replica --> HAProxy : OK
+    deactivate Replica
+    HAProxy --> S1C : Ответ
+    deactivate HAProxy
+end
+
+group Восстановление старого Primary
+    Admin -> Primary : pg_basebackup -h Replica
+    activate Primary
+    Primary --> Admin : Базовая копия создана
+    deactivate Primary
+
+    Admin -> Primary : systemctl start postgresql
+    activate Primary
+    Primary --> Admin : OK
+    deactivate Primary
+end
+
+@enduml

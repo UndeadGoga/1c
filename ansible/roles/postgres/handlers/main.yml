@@ -1,0 +1,5 @@
+---
+- name: Перезапуск PostgreSQL
+  service:
+    name: postgresql
+    state: restarted

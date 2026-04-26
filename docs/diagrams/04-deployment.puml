@@ -1,0 +1,64 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+
+title Диаграмма развёртывания (Deployment Diagram)
+
+node "Сервер приложений #1\nUbuntu 22.04 LTS" as App1 #LightYellow {
+    artifact "Docker Engine" as Docker1
+    component "1c-server-1" as S1C1
+    component "HAProxy" as HA1
+    component "Node Exporter" as NE1
+}
+
+node "Сервер приложений #2\nUbuntu 22.04 LTS" as App2 #LightYellow {
+    artifact "Docker Engine" as Docker2
+    component "1c-server-2" as S1C2
+    component "Node Exporter" as NE2
+}
+
+node "Сервер БД #1\nUbuntu 22.04 LTS" as DB1 #LightGreen {
+    artifact "Docker Engine" as Docker3
+    component "postgres-primary" as PG1
+    component "Node Exporter" as NE3
+}
+
+node "Сервер БД #2\nUbuntu 22.04 LTS" as DB2 #LightGreen {
+    artifact "Docker Engine" as Docker4
+    component "postgres-replica" as PG2
+    component "Node Exporter" as NE4
+}
+
+node "Сервер мониторинга\nUbuntu 22.04 LTS" as Mon #LightCoral {
+    artifact "Docker Engine" as Docker5
+    component "Prometheus" as Prom
+    component "Grafana" as Graf
+    component "Alertmanager" as Alert
+    component "Blackbox Exporter" as BB
+    component "PostgreSQL Exporter" as PGE
+}
+
+cloud "Сеть хранения\nNAS / NFS" as NAS #LightGray
+collection "Облачное хранилище\nS3 (MinIO)" as S3 #LightGray
+
+S1C1 --> PG1 : JDBC/TCP 5432
+S1C2 --> PG1 : JDBC/TCP 5432
+PG1 --> PG2 : Потоковая репликация
+
+HA1 --> S1C1 : TCP 1540
+HA1 --> S1C2 : TCP 1540
+
+Prom --> NE1 : HTTP 9100
+Prom --> NE2 : HTTP 9100
+Prom --> NE3 : HTTP 9100
+Prom --> NE4 : HTTP 9100
+Prom --> PGE : HTTP 9187
+Prom --> BB : HTTP 9115
+
+Graf --> Prom : HTTP 9090
+Alert --> Graf : Webhook
+
+PG1 --> NAS : pg_basebackup
+PG1 --> S3 : WAL-архивы
+
+@enduml

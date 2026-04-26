@@ -1,0 +1,51 @@
+global:
+  smtp_smarthost: 'localhost:25'
+  smtp_from: 'alert@1c-cluster.local'
+
+# Маршрутизация алертов
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'default'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+
+# Получатели уведомлений
+receivers:
+  - name: 'default'
+    email_configs:
+      - to: 'admin@1c-cluster.local'
+        subject: '[1C Alert] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'admin@1c-cluster.local'
+        subject: '[CRITICAL] 1C Cluster Alert'
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'admin@1c-cluster.local'
+        subject: '[WARNING] 1C Cluster Alert'
+
+# Ингибирование (чтобы warning не сыпались, если уже critical)
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']

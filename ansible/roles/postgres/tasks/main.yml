@@ -1,0 +1,75 @@
+---
+- name: Установка PostgreSQL
+  apt:
+    name:
+      - postgresql-15
+      - postgresql-client-15
+      - postgresql-contrib-15
+    state: present
+
+- name: Создание директории для данных
+  file:
+    path: /var/lib/postgresql/data
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+
+- name: Создание директории для бэкапов
+  file:
+    path: /backup/wal
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+
+- name: Копирование postgresql.conf (Primary)
+  template:
+    src: postgresql.conf.j2
+    dest: /etc/postgresql/15/main/postgresql.conf
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  when: pg_role == "primary"
+  notify: Перезапуск PostgreSQL
+
+- name: Копирование pg_hba.conf
+  template:
+    src: pg_hba.conf.j2
+    dest: /etc/postgresql/15/main/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: Перезапуск PostgreSQL
+
+- name: Создание пользователя replicator (Primary)
+  become_user: postgres
+  postgresql_user:
+    name: replicator
+    password: "{{ replicator_password }}"
+    role_attr_flags: REPLICATION
+  when: pg_role == "primary"
+
+- name: Создание слота репликации (Primary)
+  become_user: postgres
+  postgresql_query:
+    query: "SELECT pg_create_physical_replication_slot('replica_slot', true);"
+  when: pg_role == "primary"
+  ignore_errors: yes
+
+- name: pg_basebackup на Replica
+  become_user: postgres
+  shell: |
+    pg_basebackup -h {{ hostvars['pg-primary']['ansible_host'] }} -D /var/lib/postgresql/15/main -U replicator -P -v -R -S replica_slot -W
+  when: pg_role == "replica"
+  args:
+    creates: /var/lib/postgresql/15/main/postgresql.auto.conf
+
+- name: Запуск и включение PostgreSQL
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+
+- name: handlers
+  meta: flush_handlers

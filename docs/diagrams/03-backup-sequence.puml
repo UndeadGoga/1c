@@ -1,0 +1,74 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+
+title Сценарий резервного копирования (PostgreSQL + 1С)
+
+actor "Cron / systemd" as Cron
+participant "pg-backup.sh" as PGScript
+participant "1c-backup.sh" as S1CScript
+participant "PostgreSQL\nPrimary" as Primary
+participant "1С Сервер" as S1C
+participant "NAS / NFS" as NAS
+participant "S3 (MinIO)" as S3
+
+== Резервное копирование PostgreSQL ==
+Cron -> PGScript : Запуск (00:00)
+activate PGScript
+
+PGScript -> Primary : pg_basebackup -Ft -z
+activate Primary
+Primary --> PGScript : Базовая копия
+
+group WAL-архивы (каждые 5 мин)
+    Primary -> NAS : archive_command\ncp %p /backup/wal/%f
+end
+
+PGScript -> Primary : pg_dump -Fc
+Primary --> PGScript : Логический дамп
+
+deactivate Primary
+
+PGScript -> NAS : Копирование base backup
+activate NAS
+NAS --> PGScript : OK
+
+deactivate NAS
+
+PGScript -> S3 : Копирование дампов
+activate S3
+S3 --> PGScript : OK
+deactivate S3
+
+PGScript --> Cron : Метрика backup_last_success
+
+deactivate PGScript
+
+== Резервное копирование 1С ==
+Cron -> S1CScript : Запуск (01:00)
+activate S1CScript
+
+S1CScript -> S1C : rac infobase dump
+activate S1C
+S1C --> S1CScript : .dt файл
+
+deactivate S1C
+
+S1CScript -> NAS : Копирование .dt
+activate NAS
+NAS --> S1CScript : OK
+
+deactivate NAS
+
+S1CScript --> Cron : Метрика backup_last_success
+
+deactivate S1CScript
+
+== Ротация старых копий ==
+Cron -> NAS : find /backup -mtime +7 -delete
+activate NAS
+NAS --> Cron : Удалено
+
+deactivate NAS
+
+@enduml

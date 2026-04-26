@@ -1,0 +1,18 @@
+[Unit]
+Description=1C:Enterprise 8.3 Server
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=usr1cv8
+Group=grp1cv8
+ExecStart=/opt/1cv8/x86_64/*/ragent -d /var/lib/1c -port 1540 -regport 1541 -range 1560:1591 -seclev 0
+ExecStop=/opt/1cv8/x86_64/*/ragent stop
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=1c-server
+
+[Install]
+WantedBy=multi-user.target

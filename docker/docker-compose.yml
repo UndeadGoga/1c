@@ -1,0 +1,120 @@
+services:
+  # ============================
+  # 1С:Сервер #1 (Community)
+  # ============================
+  1c-server-1:
+    build:
+      context: ./1c-server
+    container_name: 1c-server-1
+    hostname: 1c-server-1
+    environment:
+      SRV1CV8_DATA: /var/lib/1c
+      SRV1CV8_PORT: 1540
+      SRV1CV8_REGPORT: 1541
+      SRV1CV8_RANGE: 1560:1591
+      SRV1CV8_DEBUG: "false"
+      POSTGRES_HOST: postgres-primary
+      POSTGRES_PORT: 5432
+    volumes:
+      - 1c_srv1_data:/var/lib/1c
+      - 1c_srv1_logs:/var/log/1c
+    expose:
+      - "1540"
+      - "1541"
+      - "1560-1591"
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      - postgres-primary
+    restart: unless-stopped
+
+  # ============================
+  # 1С:Сервер #2 (Community)
+  # ============================
+  1c-server-2:
+    build:
+      context: ./1c-server
+    container_name: 1c-server-2
+    hostname: 1c-server-2
+    environment:
+      SRV1CV8_DATA: /var/lib/1c
+      SRV1CV8_PORT: 1540
+      SRV1CV8_REGPORT: 1541
+      SRV1CV8_RANGE: 1560:1591
+      SRV1CV8_DEBUG: "false"
+      POSTGRES_HOST: postgres-primary
+      POSTGRES_PORT: 5432
+    volumes:
+      - 1c_srv2_data:/var/lib/1c
+      - 1c_srv2_logs:/var/log/1c
+    expose:
+      - "1540"
+      - "1541"
+      - "1560-1591"
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      - postgres-primary
+    restart: unless-stopped
+
+  # ============================
+  # RAS (Remote Administration Server)
+  # ============================
+  1c-ras:
+    build:
+      context: .
+      dockerfile: 1c-ras/Dockerfile
+    container_name: 1c-ras
+    hostname: 1c-ras
+    environment:
+      RAS_CLUSTER_HOST: 1c-server-1
+      RAS_PORT: 1545
+      CLUSTER_PORT: 1540
+    ports:
+      - "1545:1545"
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      - 1c-server-1
+    restart: unless-stopped
+
+  # ============================
+  # HAProxy (балансировщик)
+  # ============================
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: haproxy
+    hostname: haproxy
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "1540:1540"
+      - "1541:1541"
+      - "8404:8404"
+    networks:
+      - frontend
+    depends_on:
+      - 1c-server-1
+      - 1c-server-2
+    restart: unless-stopped
+
+volumes:
+  1c_srv1_data:
+  1c_srv1_logs:
+  1c_srv2_data:
+  1c_srv2_logs:
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24

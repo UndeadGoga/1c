@@ -1,0 +1,37 @@
+---
+- name: Создание директорий для мониторинга
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+    - /opt/monitoring/alertmanager
+
+- name: Копирование docker-compose мониторинга
+  template:
+    src: monitoring-compose.yml.j2
+    dest: /opt/monitoring/docker-compose.yml
+
+- name: Копирование конфигурации Prometheus
+  template:
+    src: prometheus.yml.j2
+    dest: /opt/monitoring/prometheus/prometheus.yml
+
+- name: Копирование конфигурации Alertmanager
+  template:
+    src: alertmanager.yml.j2
+    dest: /opt/monitoring/alertmanager/config.yml
+
+- name: Запуск мониторинга
+  shell: |
+    cd /opt/monitoring && docker-compose up -d
+  args:
+    creates: /opt/monitoring/.initialized
+
+- name: Маркер инициализации
+  file:
+    path: /opt/monitoring/.initialized
+    state: touch

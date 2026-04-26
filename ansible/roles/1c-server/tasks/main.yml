@@ -1,0 +1,74 @@
+---
+- name: Установка зависимостей 1С
+  apt:
+    name:
+      - libwebkit2gtk-4.0-37
+      - libenchant-2-2
+      - libhyphen0
+      - libicu70
+      - libgsf-1-114
+      - libgee-0.8-2
+      - libsqlite3-0
+      - libxslt1.1
+      - libxerces-c3.2
+      - unixodbc
+      - odbcinst
+      - odbc-postgresql
+      - ttf-mscorefonts-installer
+      - fontconfig
+      - imagemagick
+    state: present
+
+- name: Создание пользователя usr1cv8
+  user:
+    name: usr1cv8
+    group: grp1cv8
+    uid: 2001
+    system: yes
+    create_home: no
+    shell: /bin/bash
+
+- name: Создание группы grp1cv8
+  group:
+    name: grp1cv8
+    gid: 2001
+    system: yes
+
+- name: Создание директорий 1С
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: usr1cv8
+    group: grp1cv8
+    mode: '0755'
+  loop:
+    - /var/lib/1c
+    - /var/log/1c
+    - /opt/1cv8
+
+- name: Копирование deb-пакетов 1С
+  copy:
+    src: "{{ item }}"
+    dest: /tmp/
+  with_fileglob:
+    - "files/1c-enterprise83-server*.deb"
+  ignore_errors: yes
+
+- name: Установка 1С сервера
+  shell: |
+    dpkg -i /tmp/1c-enterprise83-server*.deb || apt-get install -f -y
+  when: ansible_os_family == "Debian"
+  ignore_errors: yes
+
+- name: Копирование systemd сервиса
+  template:
+    src: srv1cv8.service.j2
+    dest: /etc/systemd/system/srv1cv8.service
+    mode: '0644'
+  notify: Перезапуск 1С сервера
+
+- name: Запуск и включение 1С сервера
+  service:
+    name: srv1cv8
+    state: started
+    enabled: yes

@@ -1,0 +1,5 @@
+---
+- name: Перезапуск 1С сервера
+  service:
+    name: srv1cv8
+    state: restarted

@@ -1,0 +1,61 @@
+services:
+  postgres-primary:
+    build:
+      context: .
+      dockerfile: primary/Dockerfile
+    container_name: postgres-primary
+    hostname: postgres-primary
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      REPLICATOR_PASSWORD: repl_password
+    volumes:
+      - pg_primary_data:/var/lib/postgresql/data
+      - pg_primary_wal:/backup/wal
+      - ../backup:/backup
+    ports:
+      - "5432:5432"
+    networks:
+      - pgnet
+      - backend
+    restart: unless-stopped
+
+  postgres-replica:
+    build:
+      context: .
+      dockerfile: replica/Dockerfile
+    container_name: postgres-replica
+    hostname: postgres-replica
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      REPLICATOR_PASSWORD: repl_password
+      PRIMARY_HOST: postgres-primary
+      PRIMARY_PORT: 5432
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - pgnet
+      - backend
+    depends_on:
+      - postgres-primary
+    restart: unless-stopped
+
+volumes:
+  pg_primary_data:
+  pg_primary_wal:
+  pg_replica_data:
+
+networks:
+  pgnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.30.0/24
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

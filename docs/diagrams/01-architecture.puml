@@ -1,0 +1,68 @@
+@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title Архитектура отказоустойчивого кластера 1С:Предприятие
+
+package "Пользовательский уровень" {
+    [Тонкий клиент 1С] as Client1
+    [Веб-клиент 1С] as Client2
+    [Толстый клиент 1С] as Client3
+}
+
+package "Балансировка и маршрутизация" #LightBlue {
+    [HAProxy\nTCP-балансировка] as HAProxy <<Docker>>
+}
+
+package "Кластер 1С:Предприятие 8.3" #LightYellow {
+    [1С Сервер #1\nragent / rmngr / rphost] as S1C1 <<Docker>>
+    [1С Сервер #2\nragent / rmngr / rphost] as S1C2 <<Docker>>
+    [RAS\nУдалённое администрирование] as RAS <<Docker>>
+}
+
+package "Уровень данных" #LightGreen {
+    database "PostgreSQL 16\nPrimary (Master)" as PGPrimary <<Docker>>
+    database "PostgreSQL 16\nReplica (Standby)" as PGReplica <<Docker>>
+}
+
+package "Мониторинг и алертинг" #LightCoral {
+    [Prometheus\nСбор метрик] as Prometheus <<Docker>>
+    [Grafana\nВизуализация] as Grafana <<Docker>>
+    [Alertmanager\nОповещения] as Alertmanager <<Docker>>
+    [Node Exporter] as NodeExp <<Docker>>
+    [PostgreSQL Exporter] as PGExp <<Docker>>
+    [Blackbox Exporter] as BBExp <<Docker>>
+}
+
+package "Хранение бэкапов" #LightGray {
+    [NAS / NFS] as NAS
+    [S3 (MinIO)] as S3
+}
+
+Client1 --> HAProxy : TCP 1540
+Client2 --> HAProxy : TCP 1540
+Client3 --> HAProxy : TCP 1540
+
+HAProxy --> S1C1 : TCP 1540/1541
+HAProxy --> S1C2 : TCP 1540/1541\n(backup)
+
+S1C1 --> PGPrimary : TCP 5432
+S1C2 --> PGPrimary : TCP 5432
+
+PGPrimary --> PGReplica : Потоковая\nрепликация WAL
+
+RAS --> S1C1 : TCP 1540
+
+Prometheus --> NodeExp : HTTP 9100
+Prometheus --> PGExp : HTTP 9187
+Prometheus --> BBExp : HTTP 9115
+Prometheus --> S1C1 : HTTP (cadvisor)
+
+Grafana --> Prometheus : HTTP 9090
+Alertmanager --> Grafana : Алерты
+
+PGPrimary --> NAS : pg_basebackup
+PGPrimary --> S3 : WAL-архивы
+
+@enduml

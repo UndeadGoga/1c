@@ -1,0 +1,56 @@
+---
+- name: Обновление пакетов
+  apt:
+    update_cache: yes
+    upgrade: dist
+  when: ansible_os_family == "Debian"
+
+- name: Установка базовых утилит
+  apt:
+    name:
+      - curl
+      - wget
+      - vim
+      - htop
+      - ncdu
+      - net-tools
+      - telnet
+      - traceroute
+      - chrony
+      - logrotate
+      - unzip
+      - jq
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Настройка временной зоны
+  timezone:
+    name: Europe/Moscow
+
+- name: Запуск и включение chrony
+  service:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: Настройка sysctl (для PostgreSQL и 1С)
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: "vm.swappiness", value: "10" }
+    - { name: "vm.overcommit_memory", value: "1" }
+    - { name: "kernel.shmmax", value: "536870912" }
+    - { name: "kernel.shmall", value: "131072" }
+    - { name: "net.ipv4.ip_local_port_range", value: "9000 65500" }
+    - { name: "net.core.somaxconn", value: "4096" }
+
+- name: Создание пользователя deploy
+  user:
+    name: deploy
+    groups: sudo,docker
+    append: yes
+    shell: /bin/bash
+    create_home: yes
